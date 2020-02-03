@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/Shopify/sarama"
 	"github.com/deviceinsight/kafkactl/output"
+	"math/rand"
 	"sort"
 	"strconv"
 	"strings"
@@ -52,9 +53,10 @@ type CreateTopicFlags struct {
 }
 
 type AlterTopicFlags struct {
-	Partitions   int32
-	ValidateOnly bool
-	Configs      []string
+	Partitions        int32
+	ReplicationFactor int16
+	ValidateOnly      bool
+	Configs           []string
 }
 
 type DescribeTopicFlags struct {
@@ -225,6 +227,43 @@ func (operation *TopicOperation) AlterTopic(topic string, flags AlterTopicFlags)
 		var emptyAssignment = make([][]int32, 0)
 
 		err = admin.CreatePartitions(topic, flags.Partitions, emptyAssignment, flags.ValidateOnly)
+		if err != nil {
+			output.Failf("Could not create partitions for topic '%s': %v", topic, err)
+		}
+	}
+
+	if flags.ReplicationFactor != 0 {
+
+		var brokers = client.Brokers()
+
+		if int(flags.ReplicationFactor) > len(brokers) {
+			output.Failf("Replication factor for topic '%s' must not exceed the number of available brokers", topic)
+		}
+
+		t, _ = readTopic(&client, &admin, topic, requestedTopicFields{partitionId: true, config: true})
+
+		var partitionAssignments = make([][]int32, 0, int16(len(t.Partitions)))
+
+		for _, partition := range t.Partitions {
+			_ = partition
+
+			var assignment = make([]int32, 0, flags.ReplicationFactor)
+
+			var brokerIndex = rand.Intn(int(flags.ReplicationFactor))
+
+			for i := 0; i < int(flags.ReplicationFactor); i++ {
+				if brokerIndex >= len(brokers) {
+					brokerIndex = 0
+				}
+				// TODO make sure the assignments are well distributed
+				assignment = append(assignment, brokers[brokerIndex].ID())
+				brokerIndex++
+			}
+
+			partitionAssignments = append(partitionAssignments, assignment)
+		}
+
+		err = admin.AlterPartitionReassignments(topic, partitionAssignments)
 		if err != nil {
 			output.Failf("Could not create partitions for topic '%s': %v", topic, err)
 		}
