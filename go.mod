@@ -1,13 +1,11 @@
 module github.com/deviceinsight/kafkactl
 
 require (
-	github.com/DataDog/zstd v1.4.4 // indirect
-	github.com/Shopify/sarama v1.26.0
+	github.com/Shopify/sarama v1.26.2-0.20200306112706-950112022078
 	github.com/landoop/schema-registry v0.0.0-20190327143759-50a5701c1891
 	github.com/linkedin/goavro v0.0.0-20180427113916-2f3e1dff9761
 	github.com/pelletier/go-toml v1.6.0 // indirect
 	github.com/russross/blackfriday v2.0.0+incompatible // indirect
-	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
 	github.com/spf13/afero v1.2.2 // indirect
 	github.com/spf13/cast v1.3.1 // indirect
 	github.com/spf13/cobra v0.0.5
@@ -22,7 +20,5 @@ require (
 )
 
 replace github.com/russross/blackfriday => github.com/russross/blackfriday v1.5.2
-
-replace github.com/Shopify/sarama => ../../Shopify/sarama
 
 go 1.13
