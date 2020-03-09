@@ -5,10 +5,12 @@ import (
 )
 
 var CmdAlter = &cobra.Command{
-	Use:   "alter",
-	Short: "alter topics",
+	Use:     "alter",
+	Aliases: []string{"edit"},
+	Short:   "alter topics, partitions",
 }
 
 func init() {
 	CmdAlter.AddCommand(cmdAlterTopic)
+	CmdAlter.AddCommand(cmdAlterPartition)
 }
