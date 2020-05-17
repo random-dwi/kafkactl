@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type topic struct {
@@ -261,9 +262,33 @@ func (operation *TopicOperation) AlterTopic(topic string, flags AlterTopicFlags)
 			replicaAssignment = append(replicaAssignment, replicas)
 		}
 
-		err = admin.AlterPartitionReassignments(topic, replicaAssignment)
-		if err != nil {
-			output.Failf("Could not create partitions for topic '%s': %v", topic, err)
+		output.Infof("assign %v", replicaAssignment)
+
+		go func() {
+			err = admin.AlterPartitionReassignments(topic, replicaAssignment)
+			if err != nil {
+				output.Failf("Could not change replicas for topic '%s': %v", topic, err)
+			}
+		}()
+
+
+		partitions := make([]int32, 0)
+
+		for _, partition := range t.Partitions {
+			partitions = append(partitions, partition.Id)
+		}
+
+		for true {
+			reassignments, err := admin.ListPartitionReassignments(topic, partitions)
+			if err != nil {
+				output.Warnf("Could not get replica assignment status for topic '%s': %v", topic, err)
+			} else {
+				for partitionId, status := range reassignments[t.Name] {
+					output.Infof("partition %d replicas %v adding %v removing %v", partitionId, (*status).Replicas, (*status).AddingReplicas, (*status).RemovingReplicas)
+				}
+			}
+
+			time.Sleep(1000 * time.Millisecond)
 		}
 	}
 
@@ -330,13 +355,15 @@ func getTargetReplicas(currentReplicas []int32, brokerReplicaCount map[int32]int
 	for len(replicas) < int(targetReplicationFactor) {
 
 		sort.Slice(unusedBrokerIds, func(i, j int) bool {
-			brokerI := replicas[i]
-			brokerJ := replicas[j]
-			return brokerReplicaCount[brokerI] > brokerReplicaCount[brokerJ] || (brokerReplicaCount[brokerI] == brokerReplicaCount[brokerJ] && brokerI > brokerJ)
+			brokerI := unusedBrokerIds[i]
+			brokerJ := unusedBrokerIds[j]
+			return brokerReplicaCount[brokerI] < brokerReplicaCount[brokerJ] || (brokerReplicaCount[brokerI] == brokerReplicaCount[brokerJ] && brokerI < brokerJ)
 		})
+
 
 		replicas = append(replicas, unusedBrokerIds[0])
 		brokerReplicaCount[unusedBrokerIds[0]] += 1
+		unusedBrokerIds = unusedBrokerIds[1:]
 	}
 
 	return replicas
